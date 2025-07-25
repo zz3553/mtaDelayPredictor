@@ -173,12 +173,6 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 
 # === Database config ===
-# DB_USER = "postgres"
-# DB_PASSWORD = "commiteveryday"
-# DB_HOST = "localhost"
-# DB_PORT = "5432"
-# DB_NAME = "train_delays"
-
 DB_USER = "neondb_owner"
 DB_PASSWORD = "npg_J73HnAiwErpq"  # Replace with the password you revealed
 DB_HOST = "ep-spring-truth-ae312q45-pooler.c-2.us-east-2.aws.neon.tech"
