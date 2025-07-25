@@ -1,0 +1,138 @@
+# .github/workflows/data-collection.yml
+name: MTA and Weather Data Collection
+
+on:
+  schedule:
+    # MTA Morning Rush: 7-9 AM EST = 11 AM-1 PM UTC (standard time) / 12-2 PM UTC (daylight time)
+    # Using standard time UTC offsets - adjust seasonally if needed
+    - cron: '0 12-14 * * 1-5'    # Top of each hour
+    - cron: '15 12-14 * * 1-5'   # Quarter past
+    - cron: '30 12-14 * * 1-5'   # Half past
+    - cron: '45 12-14 * * 1-5'   # Quarter to
+
+    # MTA Evening Rush: 5-7 PM EST = 9-11 PM UTC (standard) / 10 PM-12 AM UTC (daylight)
+    - cron: '0 22-24 * * 1-5'    # Top of each hour
+    - cron: '15 22-24 * * 1-5'   # Quarter past
+    - cron: '30 22-24 * * 1-5'   # Half past
+    - cron: '45 22-24 * * 1-5'   # Quarter to
+
+    # Weather: 11:50 PM EST = 4:50 AM UTC next day
+    - cron: '50 4 * * 2-6'       # Runs Tue-Sat at 4:50 AM UTC
+
+  workflow_dispatch:
+    inputs:
+      job_type:
+        description: 'Which job to run'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+        - mta
+        - weather
+        - both
+
+jobs:
+  collect-mta-data:
+    runs-on: ubuntu-latest
+    # Run for MTA schedules or manual dispatch
+    if: |
+      contains(github.event.schedule, '12-14') ||
+      contains(github.event.schedule, '22-24') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.job_type == 'mta' || github.event.inputs.job_type == 'both'))
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5  # Updated to v5
+        with:
+          python-version: '3.11'  # Updated to more recent Python version
+          cache: 'pip'  # Cache pip dependencies
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests sqlalchemy psycopg2-binary nyct-gtfs
+
+      - name: Create data_files directory
+        run: mkdir -p data_files
+
+      - name: Run MTA data collection
+        env:
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+        run: |
+          echo "Starting MTA data collection at $(date -u) UTC"
+          python collect_real_time_mta_info.py
+          echo "Finished MTA data collection at $(date -u) UTC"
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mta-logs-${{ github.run_id }}
+          path: |
+            *.log
+            data_files/
+          retention-days: 7
+
+  collect-weather-data:
+    runs-on: ubuntu-latest
+    # Run for weather schedule or manual dispatch
+    if: |
+      contains(github.event.schedule, '50 4') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.job_type == 'weather' || github.event.inputs.job_type == 'both'))
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests sqlalchemy psycopg2-binary
+
+      - name: Run weather data collection
+        env:
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+        run: |
+          echo "Starting weather data collection at $(date -u) UTC"
+          python collect_weather_info.py
+          echo "Finished weather data collection at $(date -u) UTC"
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-logs-${{ github.run_id }}
+          path: |
+            *.log
+            data_files/
+          retention-days: 7
+
+  # Optional: Notification job that runs after both jobs complete
+  notify-completion:
+    runs-on: ubuntu-latest
+    needs: [collect-mta-data, collect-weather-data]
+    if: always() && (needs.collect-mta-data.result == 'failure' || needs.collect-weather-data.result == 'failure')
+    steps:
+      - name: Notify on failure
+        run: |
+          echo "Data collection workflow had failures:"
+          echo "MTA job: ${{ needs.collect-mta-data.result }}"
+          echo "Weather job: ${{ needs.collect-weather-data.result }}"
+          # Add notification logic here (email, Slack, etc.)
