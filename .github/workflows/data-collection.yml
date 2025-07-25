@@ -3,10 +3,21 @@ name: MTA and Weather Data Collection
 
 on:
   workflow_dispatch:
+    inputs:
+      job_type:
+        description: 'Which job to run'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+        - mta
+        - weather
+        - both
 
 jobs:
   collect-mta-data:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.inputs.job_type || github.event.inputs.job_type == 'mta' || github.event.inputs.job_type == 'both' }}
     
     steps:
       - name: Checkout code
@@ -31,6 +42,7 @@ jobs:
 
   collect-weather-data:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.inputs.job_type || github.event.inputs.job_type == 'weather' || github.event.inputs.job_type == 'both' }}
     
     steps:
       - name: Checkout code
