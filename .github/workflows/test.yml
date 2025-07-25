@@ -1,0 +1,12 @@
+# .github/workflows/test.yml
+name: Test Workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test step
+        run: echo "Hello, this workflow is working!"
