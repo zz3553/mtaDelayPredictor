@@ -33,12 +33,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas requests sqlalchemy psycopg2-binary nyct-gtfs
       
-      - name: Test MTA script
+      - name: Create data_files directory
+        run: mkdir -p data_files
+      
+      - name: Run MTA data collection
+        env:
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
         run: |
-          echo "Would run MTA data collection here"
-          echo "Current directory: $(pwd)"
-          echo "Files in directory:"
-          ls -la
+          echo "Starting MTA data collection at $(date -u) UTC"
+          python collect_real_time_mta_info.py
+          echo "Finished MTA data collection at $(date -u) UTC"
 
   collect-weather-data:
     runs-on: ubuntu-latest
@@ -58,9 +66,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas requests sqlalchemy psycopg2-binary
       
-      - name: Test weather script
+      - name: Run weather data collection
+        env:
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
         run: |
-          echo "Would run weather data collection here"
-          echo "Current directory: $(pwd)"
-          echo "Files in directory:"
-          ls -la
+          echo "Starting weather data collection at $(date -u) UTC"
+          python collect_weather_info.py
+          echo "Finished weather data collection at $(date -u) UTC"
