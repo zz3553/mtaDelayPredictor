@@ -2,6 +2,22 @@
 name: MTA and Weather Data Collection
 
 on:
+  schedule:
+    # MTA Morning Rush: 7-9 AM EST = 12-2 PM UTC (assuming EST, adjust for EDT)
+    - cron: '0 12-14 * * 1-5'    # Top of each hour
+    - cron: '15 12-14 * * 1-5'   # Quarter past
+    - cron: '30 12-14 * * 1-5'   # Half past  
+    - cron: '45 12-14 * * 1-5'   # Quarter to
+    
+    # MTA Evening Rush: 5-7 PM EST = 10 PM-12 AM UTC
+    - cron: '0 22-24 * * 1-5'    # Top of each hour
+    - cron: '15 22-24 * * 1-5'   # Quarter past
+    - cron: '30 22-24 * * 1-5'   # Half past
+    - cron: '45 22-24 * * 1-5'   # Quarter to
+    
+    # Weather: Daily at 11:50 PM EST = 4:50 AM UTC next day (weekdays only)
+    - cron: '50 4 * * 2-6'       # Runs Tue-Sat at 4:50 AM UTC (Mon-Fri 11:50 PM EST)
+  
   workflow_dispatch:
     inputs:
       job_type:
@@ -17,7 +33,17 @@ on:
 jobs:
   collect-mta-data:
     runs-on: ubuntu-latest
-    if: ${{ !github.event.inputs.job_type || github.event.inputs.job_type == 'mta' || github.event.inputs.job_type == 'both' }}
+    # Run for MTA schedules (rush hours) or manual dispatch
+    if: |
+      github.event_name == 'schedule' && (
+        contains(github.event.schedule, '12-14') || 
+        contains(github.event.schedule, '22-24')
+      ) ||
+      (github.event_name == 'workflow_dispatch' && (
+        !github.event.inputs.job_type || 
+        github.event.inputs.job_type == 'mta' || 
+        github.event.inputs.job_type == 'both'
+      ))
     
     steps:
       - name: Checkout code
@@ -50,7 +76,14 @@ jobs:
 
   collect-weather-data:
     runs-on: ubuntu-latest
-    if: ${{ !github.event.inputs.job_type || github.event.inputs.job_type == 'weather' || github.event.inputs.job_type == 'both' }}
+    # Run for weather schedule or manual dispatch
+    if: |
+      (github.event_name == 'schedule' && contains(github.event.schedule, '50 4')) ||
+      (github.event_name == 'workflow_dispatch' && (
+        !github.event.inputs.job_type || 
+        github.event.inputs.job_type == 'weather' || 
+        github.event.inputs.job_type == 'both'
+      ))
     
     steps:
       - name: Checkout code
