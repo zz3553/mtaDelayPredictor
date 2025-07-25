@@ -33,8 +33,8 @@ on:
 jobs:
   collect-mta-data:
     runs-on: ubuntu-latest
-    # Simplified condition: Run if it's a manual trigger OR if it's a scheduled MTA time
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && !contains(github.event.schedule, '50 4')) }}
+    # Single line condition - same logic as your working manual version
+    if: ${{ (github.event_name == 'workflow_dispatch' && (!github.event.inputs.job_type || github.event.inputs.job_type == 'mta' || github.event.inputs.job_type == 'both')) || (github.event_name == 'schedule' && !contains(github.event.schedule, '50 4')) }}
     
     steps:
       - name: Checkout code
@@ -67,8 +67,8 @@ jobs:
 
   collect-weather-data:
     runs-on: ubuntu-latest
-    # Run if it's a manual trigger OR if it's the weather schedule time
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && contains(github.event.schedule, '50 4')) }}
+    # Single line condition - same logic as your working manual version  
+    if: ${{ (github.event_name == 'workflow_dispatch' && (!github.event.inputs.job_type || github.event.inputs.job_type == 'weather' || github.event.inputs.job_type == 'both')) || (github.event_name == 'schedule' && contains(github.event.schedule, '50 4')) }}
     
     steps:
       - name: Checkout code
