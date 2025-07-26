@@ -3,7 +3,7 @@ name: Test Cron Schedule
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/1 * * * *"  # Runs every 5 minutes for testing
+    - cron: "*/15 * * * *"  # Runs every 5 minutes for testing
 
 jobs:
   test-cron:
