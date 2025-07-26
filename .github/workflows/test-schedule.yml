@@ -1,4 +1,3 @@
-# .github/workflows/test-schedule.yml
 name: Test Schedule Debug
 
 on:
@@ -7,7 +6,7 @@ on:
     - cron: '*/1 * * * *'
 
 jobs:
-  test-job:
+  test-cron:
     runs-on: ubuntu-latest
     steps:
       - name: Test scheduled run
