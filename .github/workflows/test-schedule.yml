@@ -3,8 +3,8 @@ name: Test Schedule Debug
 
 on:
   schedule:
-    # Test every minute for the next 5 minutes
-    - cron: '* * * * *'  # Every minute
+    # Simple test - every 5 minutes
+    - cron: '*/1 * * * *'
 
 jobs:
   test-job:
