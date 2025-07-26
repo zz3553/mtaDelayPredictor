@@ -1,0 +1,17 @@
+# .github/workflows/test-schedule.yml
+name: Test Schedule Debug
+
+on:
+  schedule:
+    # Test every minute for the next 5 minutes
+    - cron: '* * * * *'  # Every minute
+  workflow_dispatch:
+
+jobs:
+  test-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test scheduled run
+        run: |
+          echo "Scheduled test ran at $(date -u) UTC"
+          echo "This confirms scheduling works!"
