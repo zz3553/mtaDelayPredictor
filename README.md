@@ -30,10 +30,10 @@ rm -rf mta-lambda-directory deployment.zip
 mkdir package
 cp lambda_function.py ./package/
 cd package
-zip -r ../deployment.zip .
+zip -r deployment.zip .
 cd ..
 
-aws lambda update-function-code   --function-name collectRealTimeMtaInfo   --zip-file fileb://deployment_package.zip
+aws lambda update-function-code   --function-name collectRealTimeMtaInfo   --zip-file fileb://deployment.zip
 
 
 docker run --rm --entrypoint="" -v $(pwd):/var/task public.ecr.aws/lambda/python:3.10   /bin/bash -c "
