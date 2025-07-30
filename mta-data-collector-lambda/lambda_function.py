@@ -40,7 +40,7 @@ class SubwayDelayTracker:
                     'database': os.getenv('DB_NAME', 'neondb')
                 }
 
-            connection_string = f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
+            connection_string = f"postgresql+psycopg2://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
             self.db_engine = create_engine(connection_string, pool_pre_ping=True, pool_recycle=3600)
 
             self.log_with_time("Database connection initialized successfully")
@@ -74,7 +74,7 @@ class SubwayDelayTracker:
         """
 
         try:
-            with self.db_engine.connect() as conn:
+            with self.db_engine.begin() as conn:
                 conn.execute(text(create_train_delays_sql))
                 conn.commit()
 
@@ -124,7 +124,7 @@ class SubwayDelayTracker:
                 processed_records.append(processed_record)
 
             # Batch insert
-            with self.db_engine.connect() as conn:
+            with self.db_engine.begin() as conn:
                 result = conn.execute(text(insert_sql), processed_records)
                 conn.commit()
                 inserted_count = result.rowcount
