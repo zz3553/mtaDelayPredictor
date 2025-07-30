@@ -1,6 +1,6 @@
 import json
 import csv
-import requests
+import urllib3  # Replace requests with urllib3
 import zipfile
 import re
 import io
@@ -26,6 +26,7 @@ class SubwayDelayTracker:
         self.stop_times_index = defaultdict(list)  # Index by trip_id for faster lookups
         self.trip_stop_index = defaultdict(dict)  # Index by trip_id -> stop_id for O(1) lookups
         self.db_engine = None
+        self.http = urllib3.PoolManager()  # Initialize urllib3 pool manager
 
     def initialize_database(self, db_config: Dict[str, str] = None):
         """Initialize database connection with configuration"""
@@ -150,14 +151,19 @@ class SubwayDelayTracker:
             logger.info(f"[{timestamp}] {message}")
 
     def download_and_parse_gtfs(self, url: str = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_supplemented.zip") -> bool:
-        """Download and parse GTFS data with error handling"""
+        """Download and parse GTFS data with error handling - using urllib3 instead of requests"""
         try:
             self.log_with_time("Downloading GTFS data...")
-            response = requests.get(url, timeout=30)
-            response.raise_for_status()
+
+            # Replace requests with urllib3
+            response = self.http.request('GET', url, timeout=30)
+
+            # Check if request was successful
+            if response.status != 200:
+                raise Exception(f"HTTP {response.status}: Failed to download GTFS data")
 
             self.log_with_time("Extracting stop_times.txt...")
-            with zipfile.ZipFile(io.BytesIO(response.content)) as zip_file:
+            with zipfile.ZipFile(io.BytesIO(response.data)) as zip_file:
                 stop_times_file_path = None
                 for file_path in zip_file.namelist():
                     if file_path.endswith('stop_times.txt'):
@@ -180,11 +186,8 @@ class SubwayDelayTracker:
             self._build_indexes()
             return True
 
-        except requests.RequestException as e:
-            self.log_with_time(f"Error downloading GTFS data: {str(e)}", "ERROR")
-            return False
         except Exception as e:
-            self.log_with_time(f"Error parsing GTFS data: {str(e)}", "ERROR")
+            self.log_with_time(f"Error downloading/parsing GTFS data: {str(e)}", "ERROR")
             return False
 
     def _build_indexes(self):
