@@ -1,5 +1,7 @@
 import json
 import csv
+
+import boto3
 import urllib3  # Replace requests with urllib3
 import zipfile
 import re
@@ -8,7 +10,8 @@ import logging
 from datetime import datetime, time as dt_time, timedelta
 from collections import defaultdict
 from typing import Dict, List, Optional
-import os
+
+from botocore.exceptions import NoCredentialsError, ClientError
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from zoneinfo import ZoneInfo
@@ -20,6 +23,56 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def get_neon_db_credentials_from_aws_sm():
+    """Retrieve database credentials from AWS Secrets Manager"""
+    secret_name = "neon_db_credentials"
+    region_name = "us-east-1"
+
+    # Create a Secrets Manager client
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+
+    try:
+        logger.info(f"Retrieving secret: {secret_name}")
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+        logger.info("Secret retrieved successfully")
+
+        # Parse the JSON secret
+        secret = json.loads(get_secret_value_response['SecretString'])
+        return secret
+
+    except ClientError as e:
+        # Handle specific AWS errors
+        error_code = e.response['Error']['Code']
+        logger.error(f"AWS Secrets Manager error ({error_code}): {str(e)}")
+
+        if error_code == 'DecryptionFailureException':
+            raise e
+        elif error_code == 'InternalServiceErrorException':
+            raise e
+        elif error_code == 'InvalidParameterException':
+            raise e
+        elif error_code == 'InvalidRequestException':
+            raise e
+        elif error_code == 'ResourceNotFoundException':
+            logger.error(f"Secret {secret_name} not found")
+            raise e
+        else:
+            raise e
+
+    except NoCredentialsError:
+        logger.error("AWS credentials not found")
+        raise
+
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving secret: {str(e)}")
+        raise
 
 class SubwayDelayTracker:
     def __init__(self):
@@ -33,13 +86,13 @@ class SubwayDelayTracker:
         """Initialize database connection with configuration"""
         try:
             if not db_config:
-                # Get from environment variables (recommended for Lambda)
+                aws_sm_response = get_neon_db_credentials_from_aws_sm()
                 db_config = {
-                    'user': os.getenv('DB_USER', 'neondb_owner'),
-                    'password': os.getenv('DB_PASSWORD', 'npg_J73HnAiwErpq'),
-                    'host': os.getenv('DB_HOST', 'ep-spring-truth-ae312q45-pooler.c-2.us-east-2.aws.neon.tech'),
-                    'port': os.getenv('DB_PORT', '5432'),
-                    'database': os.getenv('DB_NAME', 'neondb')
+                    'user': aws_sm_response['username'],
+                    'password': aws_sm_response['password'],
+                    'host': aws_sm_response['host'],
+                    'port': aws_sm_response['port'],
+                    'database': aws_sm_response['dbname']
                 }
 
             connection_string = f"postgresql+pg8000://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
