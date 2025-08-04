@@ -343,6 +343,12 @@ class SubwayDelayTracker:
                             else:
                                 status = "early"
 
+                            if delay > 100:
+                                logger.info(F"Logging incorrect calculating of delay info."
+                                            F"Current time: {current_time}"
+                                            F"Time to use: {time_to_use}"
+                                            F"Schedule data: {schedule_data}")
+
                             result = {
                                 "trip_id": trip_id,
                                 "stop_id_raw": stop_id,
