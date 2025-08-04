@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'MTA Delay Tracker Lambda Function with EventBridge Cron Schedule'
+
+Resources:
+  # IAM Role for Lambda
+  MTALambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: MTADelayTrackerRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: VPCAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                  - ec2:AttachNetworkInterface
+                  - ec2:DetachNetworkInterface
+                Resource: '*'
+
+  # Lambda Function
+  MTADelayTrackerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: mta-delay-tracker
+      Runtime: python3.9
+      Handler: collect_real_time_mta_info.lambda_handler  # Updated handler
+      Role: !GetAtt MTALambdaRole.Arn
+      Timeout: 300  # 5 minutes
+      MemorySize: 1024  # 1GB RAM for pandas processing
+      Code:
+        ZipFile: |
+          # Placeholder - you'll upload the actual code
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Placeholder'}
+      Environment:
+        Variables:
+          PYTHONPATH: /var/task
+
+  # EventBridge Rule for Rush Hour Schedule
+  MorningRushHourRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: mta-morning-rush-schedule
+      Description: 'Trigger MTA delay tracker every 15 minutes during morning rush hour (7-10 AM EST) on weekdays'
+      ScheduleExpression: 'cron(0,15,30,45 11-13 ? * MON-FRI *)'  # 7-10 AM EST = 11-13 UTC
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt MTADelayTrackerFunction.Arn
+          Id: MorningRushTarget
+
+  EveningRushHourRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: mta-evening-rush-schedule
+      Description: 'Trigger MTA delay tracker every 15 minutes during evening rush hour (4-7 PM EST) on weekdays'
+      ScheduleExpression: 'cron(0,15,30,45 20-22 ? * MON-FRI *)'  # 4-7 PM EST = 20-22 UTC
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt MTADelayTrackerFunction.Arn
+          Id: EveningRushTarget
+
+  # Permissions for EventBridge to invoke Lambda
+  MorningRushLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref MTADelayTrackerFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt MorningRushHourRule.Arn
+
+  EveningRushLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref MTADelayTrackerFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EveningRushHourRule.Arn
+
+Outputs:
+  MTALambdaFunctionArn:
+    Description: 'ARN of the MTA Delay Tracker Lambda function'
+    Value: !GetAtt MTADelayTrackerFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-MTALambdaFunctionArn'
+
+  MorningScheduleArn:
+    Description: 'ARN of the morning rush hour EventBridge rule'
+    Value: !GetAtt MorningRushHourRule.Arn
+
+  EveningScheduleArn:
+    Description: 'ARN of the evening rush hour EventBridge rule'
+    Value: !GetAtt EveningRushHourRule.Arn
