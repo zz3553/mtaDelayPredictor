@@ -11,7 +11,6 @@ from typing import Dict, List, Optional
 import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
-from zoneinfo import ZoneInfo
 
 # Configure logging
 logging.basicConfig(
@@ -254,34 +253,26 @@ class SubwayDelayTracker:
                 return None
 
     def calculate_delay(self, scheduled_time_str: str, current_time: datetime) -> Optional[float]:
-        """Calculate delay with proper timezone handling"""
+        """Calculate delay with proper error handling"""
         try:
             scheduled_time = self.parse_time_string(scheduled_time_str)
             if not scheduled_time:
                 return None
 
-            # Ensure current_time is timezone-aware
-            if current_time.tzinfo is None:
-                current_time = current_time.replace(tzinfo=ZoneInfo('UTC'))
+            # Combine with current date
+            scheduled_dt = datetime.combine(current_time.date(), scheduled_time)
 
-            # Convert to Eastern for local time comparison
-            local_current = current_time.astimezone(ZoneInfo('US/Eastern'))
-
-            # Create scheduled datetime in Eastern timezone
-            scheduled_dt = datetime.combine(local_current.date(), scheduled_time)
-            scheduled_dt = scheduled_dt.replace(tzinfo=ZoneInfo('US/Eastern'))
-
-            # Handle day boundary crossings
-            if scheduled_dt < local_current - timedelta(hours=12):
+            # Handle next-day scenarios
+            if scheduled_dt < current_time - timedelta(hours=12):
                 scheduled_dt += timedelta(days=1)
-            elif scheduled_dt > local_current + timedelta(hours=12):
+            elif scheduled_dt > current_time + timedelta(hours=12):
                 scheduled_dt -= timedelta(days=1)
 
-            delay_seconds = (local_current - scheduled_dt).total_seconds()
-            return delay_seconds / 60.0
+            delay_seconds = (current_time - scheduled_dt).total_seconds()
+            return delay_seconds / 60.0  # Convert to minutes
 
         except Exception as e:
-            logger.error(f"Error calculating delay for {scheduled_time_str}: {str(e)}")
+            self.log_with_time(f"Error calculating delay for {scheduled_time_str}: {str(e)}", "ERROR")
             return None
 
     def classify_rush_hour(self, timestamp: datetime) -> Optional[str]:
@@ -312,12 +303,6 @@ class SubwayDelayTracker:
                 trip_id = getattr(train, 'trip_id', None)
                 current_time = getattr(train, 'last_position_update', None)
                 stop_id = getattr(train, 'location', None)
-
-                if current_time.tzinfo is None:
-                    current_time = current_time.replace(tzinfo=ZoneInfo('UTC'))
-
-                    # Convert to Eastern Time
-                    current_time = current_time.astimezone(ZoneInfo('US/Eastern'))
 
                 if not all([trip_id, current_time, stop_id]):
                     continue
@@ -359,12 +344,10 @@ class SubwayDelayTracker:
                                 status = "early"
 
                             if delay > 100:
-                                print(F"Logging incorrect calculating of delay info. "
-                                            F"Current time: {current_time} "
-                                            F"Time to use: {time_to_use} "
-                                            F"Schedule data: {schedule_data} "
-                                            F"Stop ID: {stop_id}"
-                                            F"Train from GTFS: {train}")
+                                logger.info(F"Logging incorrect calculating of delay info."
+                                            F"Current time: {current_time}"
+                                            F"Time to use: {time_to_use}"
+                                            F"Schedule data: {schedule_data}")
 
                             result = {
                                 "trip_id": trip_id,
