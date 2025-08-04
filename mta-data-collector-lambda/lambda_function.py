@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 def get_neon_db_credentials_from_aws_sm():
     """Retrieve database credentials from AWS Secrets Manager"""
-    secret_name = "neon_db_credentials"
+    secret_name = "neon_db_credentials_updated"
     region_name = "us-east-1"
 
     # Create a Secrets Manager client
