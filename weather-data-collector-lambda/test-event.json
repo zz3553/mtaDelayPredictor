@@ -1,0 +1,14 @@
+{
+    "locations": [
+        {
+            "lat": 40.7831,
+            "lon": -73.9712,
+            "name": "NYC_Manhattan_Test"
+        },
+        {
+            "lat": 40.6782,
+            "lon": -73.9442,
+            "name": "NYC_Brooklyn_Test"
+        }
+    ]
+}
