@@ -6,8 +6,7 @@ https://mtadelaypredictor-qgkwb8yejdoyyrqtyrjhrc.streamlit.app/
 
 Current Architecture
 
-<img width="767" height="1023" alt="image" src="https://github.com/user-attachments/assets/2e7bcda1-4522-434a-a6c6-e78947aebbdc" />
-
+<img width="1534" height="2047" alt="image" src="https://github.com/user-attachments/assets/7eb69e13-1b18-4f47-890c-41714e3873a8" />
 
 # Deploying to AWS
 rm -rf mta-lambda-directory deployment.zip
