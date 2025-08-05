@@ -1,0 +1,4 @@
+requests==2.31.0
+pg8000==1.30.2
+scramp==1.4.4
+asn1crypto==1.5.1
