@@ -174,7 +174,7 @@ from sqlalchemy import create_engine, text
 
 # === Database config ===
 DB_USER = "neondb_owner"
-DB_PASSWORD = "npg_J73HnAiwErpq"  # Replace with the password you revealed
+DB_PASSWORD = ""  # Replace with the password you revealed
 DB_HOST = "ep-spring-truth-ae312q45-pooler.c-2.us-east-2.aws.neon.tech"
 DB_PORT = "5432"
 DB_NAME = "neondb"

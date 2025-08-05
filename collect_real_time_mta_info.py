@@ -10,7 +10,7 @@ from nyct_gtfs.gtfs_static_types import Stations
 
 # Database configuration
 DB_USER = "neondb_owner"
-DB_PASSWORD = "npg_J73HnAiwErpq"
+DB_PASSWORD = ""
 DB_HOST = "ep-spring-truth-ae312q45-pooler.c-2.us-east-2.aws.neon.tech"
 DB_PORT = "5432"
 DB_NAME = "neondb"

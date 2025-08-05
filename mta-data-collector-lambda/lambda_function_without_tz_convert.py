@@ -35,7 +35,7 @@ class SubwayDelayTracker:
                 # Get from environment variables (recommended for Lambda)
                 db_config = {
                     'user': os.getenv('DB_USER', 'neondb_owner'),
-                    'password': os.getenv('DB_PASSWORD', 'npg_J73HnAiwErpq'),
+                    'password': os.getenv('DB_PASSWORD', ''),
                     'host': os.getenv('DB_HOST', 'ep-spring-truth-ae312q45-pooler.c-2.us-east-2.aws.neon.tech'),
                     'port': os.getenv('DB_PORT', '5432'),
                     'database': os.getenv('DB_NAME', 'neondb')
