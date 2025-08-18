@@ -1,0 +1,7 @@
+metric,value
+count,1211.0
+mean_delay,1.5776218001651527
+median_delay,0.37
+std_delay,6.304007773544762
+max_delay,48.37
+min_delay,-30.78
