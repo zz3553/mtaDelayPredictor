@@ -14,10 +14,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from datetime import datetime, timedelta
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -44,24 +42,6 @@ def connect_to_database():
     Connect to your PostgreSQL database
     Update these credentials to match your setup
     """
-    # Option 1: Direct connection (for testing)
-    db_config = {
-        'user': 'neondb_owner',
-        'password': 'npg_VOXZBcRohC81',
-        'host': 'ep-spring-truth-ae312q45.c-2.us-east-2.aws.neon.tech/neondb',
-        'port': 5432,
-        'database': 'neondb'
-    }
-
-    # Option 2: Environment variables (recommended)
-    # db_config = {
-    #     'host': os.getenv('DB_HOST'),
-    #     'port': os.getenv('DB_PORT', 5432),
-    #     'database': os.getenv('DB_NAME'),
-    #     'user': os.getenv('DB_USER'),
-    #     'password': os.getenv('DB_PASSWORD')
-    # }
-
     connection_string = f"postgresql://neondb_owner:npg_VOXZBcRohC81@ep-spring-truth-ae312q45.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
     engine = create_engine(connection_string)
     return engine
@@ -71,10 +51,12 @@ def load_data(engine, limit=None):
     """Load train delay and weather data"""
 
     # Load train delays
-    delay_query = """
-    SELECT 
-        trip_id, stop_id, station_name, timestamp, delay_min, 
-        status, direction, stop_sequence, rush_hour, created_at
+    delay_query ="""
+        SELECT 
+        trip_id, stop_id, station_name, 
+        timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'America/New_York' as timestamp,
+        delay_min, status, direction, stop_sequence, rush_hour, 
+        created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/New_York' as created_at
     FROM train_delays 
     ORDER BY timestamp DESC
     """
@@ -87,7 +69,7 @@ def load_data(engine, limit=None):
     # Load weather data
     weather_query = """
     SELECT 
-        timestamp, location_name, temp_fahrenheit, feels_like_fahrenheit,
+        timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'America/New_York' as timestamp, location_name, temp_fahrenheit, feels_like_fahrenheit,
         weather_main, weather_description, pressure, humidity, visibility,
         wind_speed, wind_direction, rain_1h, rain_3h, snow_1h, snow_3h,
         cloudiness, is_precipitation, is_snow, is_extreme_temp, 
@@ -520,7 +502,7 @@ except Exception as e:
 # 7. EXPORT RESULTS
 # =============================================================================
 
-def export_summary_stats(delays_df, weather_df, merged_df=None):
+def export_summary_stats(delays_df, merged_df=None):
     """Export key statistics to CSV for further analysis"""
 
     # Delay summary stats
