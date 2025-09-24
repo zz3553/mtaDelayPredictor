@@ -48,5 +48,3 @@ echo "✅ Layer attached to function"
 # Clean up
 rm -rf layer/
 rm mta-dependencies-layer.zip
-
-echo "🎉 Now you can deploy just your code without dependencies!"
