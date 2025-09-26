@@ -1,13 +1,11 @@
-import pandas as pd
+import warnings
+
 import numpy as np
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
+import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.model_selection import train_test_split
 from sqlalchemy import create_engine
-import warnings
 
 warnings.filterwarnings('ignore')
 
@@ -280,6 +278,7 @@ class HybridWeatherFeatureEngineer:
 
         print(f"\nHybrid feature engineering complete!")
         print(f"Total engineered features: {len(self.engineered_features)}")
+        print(f"All engineered features: {self.engineered_features}")
         print(f"Dataset shape: {df.shape}")
 
         # Feature category breakdown
@@ -369,6 +368,28 @@ class HybridWeatherFeatureEngineer:
 
         # Category performance summary
         self._analyze_category_performance(feature_importance)
+
+        # SAVE THE MODEL FOR STREAMLIT DEPLOYMENT
+        print(f"\n💾 SAVING MODEL FOR DEPLOYMENT...")
+
+        import pickle
+
+        # Save the trained Random Forest model
+        with open('mta_delay_model.pkl', 'wb') as f:
+            pickle.dump(rf, f)
+
+        # Save feature columns for reference
+        with open('feature_columns.pkl', 'wb') as f:
+            pickle.dump(available_features, f)
+
+        # Save scaler if you used one (optional)
+        # with open('scaler.pkl', 'wb') as f:
+        #     pickle.dump(scaler, f)
+
+        print(f"✅ Model saved successfully!")
+        print(f"   - Model: mta_delay_model.pkl")
+        print(f"   - Features: feature_columns.pkl")
+        print(f"   - Ready for Streamlit deployment!")
 
         return feature_importance, r2, np.sqrt(mse)
 

@@ -1,13 +1,12 @@
-import pickle
-from datetime import datetime, timedelta
-from typing import Dict, List
-
-import numpy as np
-import pandas as pd
-import plotly.express as px
-import requests
 import streamlit as st
+import pandas as pd
+import numpy as np
+import pickle
+import plotly.express as px
+from datetime import datetime, timedelta
+import requests
 from sqlalchemy import create_engine
+from typing import Dict, List
 
 # Page config
 st.set_page_config(
@@ -26,18 +25,59 @@ class MTADelayPredictor:
         self.weather_api_key = weather_api_key
         self.feature_columns = self._get_feature_columns()
 
-        # NYC Station coordinates (sample - you can expand this)
+        # NYC Station coordinates
         self.stations = {
-            "Times Sq-42 St": {"lat": 40.7590, "lon": -73.9845},
-            "Union Sq-14 St": {"lat": 40.7359, "lon": -73.9911},
-            "Grand Central-42 St": {"lat": 40.7527, "lon": -73.9772},
-            "14 St-Union Sq": {"lat": 40.7359, "lon": -73.9911},
-            "34 St-Herald Sq": {"lat": 40.7505, "lon": -73.9884},
-            "42 St-Port Authority": {"lat": 40.7570, "lon": -73.9897},
-            "Atlantic Av-Barclays Ctr": {"lat": 40.6840, "lon": -73.9769},
-            "Fulton St": {"lat": 40.7097, "lon": -73.0067},
-            "Wall St": {"lat": 40.7074, "lon": -74.0113},
-            "Canal St": {"lat": 40.7227, "lon": -74.0027}
+            # Queens
+            "Astoria-Ditmars Blvd": {"lat": 40.7839, "lon": -73.9126},
+            "Astoria Blvd-Hoyt Av": {"lat": 40.7788, "lon": -73.9179},
+            "30 Av": {"lat": 40.7711, "lon": -73.9216},
+            "Broadway": {"lat": 40.7645, "lon": -73.9254},
+            "36 Av": {"lat": 40.7628, "lon": -73.9295},
+            "39 Av-Dutch Kills": {"lat": 40.7584, "lon": -73.9329},
+            "Queensboro Plaza": {"lat": 40.7505, "lon": -73.9402},
+
+            # Manhattan
+            "Lexington Av/59 St": {"lat": 40.7626, "lon": -73.9672},
+            "5 Av/59 St": {"lat": 40.7648, "lon": -73.9734},
+            "57 St-7 Av": {"lat": 40.7640, "lon": -73.9798},
+            "49 St": {"lat": 40.7599, "lon": -73.9840},
+            "Times Sq-42 St": {"lat": 40.7554, "lon": -73.9877},
+            "34 St-Herald Sq": {"lat": 40.7495, "lon": -73.9879},
+            "28 St": {"lat": 40.7443, "lon": -73.9904},
+            "23 St": {"lat": 40.7413, "lon": -73.9901},
+            "14 St-Union Sq": {"lat": 40.7358, "lon": -73.9906},
+            "8 St-NYU": {"lat": 40.7302, "lon": -73.9926},
+            "Prince St": {"lat": 40.7246, "lon": -73.9972},
+            "Canal St": {"lat": 40.7196, "lon": -74.0018},
+            "City Hall": {"lat": 40.7130, "lon": -74.0062},
+            "Cortlandt St": {"lat": 40.7093, "lon": -74.0116},
+            "Rector St": {"lat": 40.7073, "lon": -74.0132},
+            "Whitehall St-South Ferry": {"lat": 40.7032, "lon": -74.0129},
+
+            # Brooklyn
+            "Court St": {"lat": 40.6942, "lon": -73.9900},
+            "Jay St-MetroTech": {"lat": 40.6924, "lon": -73.9873},
+            "DeKalb Av": {"lat": 40.6908, "lon": -73.9818},
+            "Atlantic Av-Barclays Ctr": {"lat": 40.6844, "lon": -73.9796},
+            "Union St": {"lat": 40.6784, "lon": -73.9830},
+            "9 St": {"lat": 40.6732, "lon": -73.9850},
+            "Prospect Av": {"lat": 40.6655, "lon": -73.9868},
+            "25 St": {"lat": 40.6603, "lon": -73.9893},
+            "36 St": {"lat": 40.6551, "lon": -73.9942},
+            "45 St": {"lat": 40.6477, "lon": -74.0011},
+            "53 St": {"lat": 40.6416, "lon": -74.0084},
+            "59 St": {"lat": 40.6369, "lon": -74.0112},
+            "8 Av": {"lat": 40.6358, "lon": -74.0041},
+            "Fort Hamilton Pkwy": {"lat": 40.6318, "lon": -74.0040},
+            "New Utrecht Av": {"lat": 40.6288, "lon": -74.0004},
+            "18 Av": {"lat": 40.6225, "lon": -73.9928},
+            "20 Av": {"lat": 40.6186, "lon": -73.9897},
+            "Bay Pkwy": {"lat": 40.6138, "lon": -73.9868},
+            "Kings Hwy": {"lat": 40.6087, "lon": -73.9825},
+            "Avenue U": {"lat": 40.6030, "lon": -73.9785},
+            "86 St": {"lat": 40.5968, "lon": -73.9739},
+            "Gravesend-86 St": {"lat": 40.5954, "lon": -73.9715},
+            "Coney Island-Stillwell Av": {"lat": 40.5772, "lon": -73.9815}
         }
 
     @st.cache_resource
@@ -52,31 +92,112 @@ class MTADelayPredictor:
             return None
 
     def _get_feature_columns(self) -> List[str]:
-        """Define the feature columns expected by the model"""
+        """Exact feature list from your trained model"""
         return [
-            # Core weather features
-            'wind_speed', 'feels_like_fahrenheit', 'humidity', 'pressure', 'visibility', 'cloudiness',
-
-            # Temporal features
-            'hour', 'day_of_week', 'is_weekend', 'is_morning_rush', 'is_evening_rush',
-            'is_rush_hour', 'minutes_since_rush_start',
-
-            # Rolling window features
-            'humidity_rolling_mean_120min', 'feels_like_fahrenheit_rolling_min_120min',
-            'feels_like_fahrenheit_rolling_mean_120min', 'feels_like_fahrenheit_rolling_std_120min',
-            'wind_speed_rolling_max_120min', 'humidity_rolling_std_120min', 'wind_speed_rolling_std_120min',
-
-            # Lag features
-            'feels_like_fahrenheit_change_60min', 'feels_like_fahrenheit_lag_60min',
+            'wind_speed',
+            'feels_like_fahrenheit',
+            'humidity',
+            'pressure',
+            'visibility',
+            'cloudiness',
+            'rain_1h',
+            'hour',
+            'day_of_week',
+            'is_weekend',
+            'is_morning_rush',
+            'is_evening_rush',
+            'is_rush_hour',
+            'minutes_since_rush_start',
+            'rain_1h_rolling_min_60min',
+            'rain_1h_rolling_mean_60min',
+            'rain_1h_rolling_std_60min',
+            'rain_1h_rolling_max_60min',
+            'rain_1h_rolling_min_120min',
+            'rain_1h_rolling_mean_120min',
+            'rain_1h_rolling_std_120min',
+            'rain_1h_rolling_max_120min',
+            'wind_speed_rolling_min_60min',
+            'wind_speed_rolling_mean_60min',
+            'wind_speed_rolling_std_60min',
+            'wind_speed_rolling_max_60min',
+            'wind_speed_rolling_min_120min',
+            'wind_speed_rolling_mean_120min',
+            'wind_speed_rolling_std_120min',
+            'wind_speed_rolling_max_120min',
+            'feels_like_fahrenheit_rolling_min_60min',
+            'feels_like_fahrenheit_rolling_mean_60min',
+            'feels_like_fahrenheit_rolling_std_60min',
+            'feels_like_fahrenheit_rolling_max_60min',
+            'feels_like_fahrenheit_rolling_min_120min',
+            'feels_like_fahrenheit_rolling_mean_120min',
+            'feels_like_fahrenheit_rolling_std_120min',
+            'feels_like_fahrenheit_rolling_max_120min',
+            'humidity_rolling_min_60min',
+            'humidity_rolling_mean_60min',
+            'humidity_rolling_std_60min',
+            'humidity_rolling_max_60min',
+            'humidity_rolling_min_120min',
+            'humidity_rolling_mean_120min',
+            'humidity_rolling_std_120min',
+            'humidity_rolling_max_120min',
+            'pressure_rolling_min_60min',
+            'pressure_rolling_mean_60min',
+            'pressure_rolling_std_60min',
+            'pressure_rolling_max_60min',
+            'pressure_rolling_min_120min',
+            'pressure_rolling_mean_120min',
+            'pressure_rolling_std_120min',
+            'pressure_rolling_max_120min',
+            'wind_speed_lag_15min',
+            'wind_speed_change_15min',
+            'wind_speed_lag_30min',
+            'wind_speed_change_30min',
+            'wind_speed_lag_60min',
+            'wind_speed_change_60min',
+            'rain_1h_lag_15min',
+            'rain_1h_change_15min',
+            'rain_1h_lag_30min',
+            'rain_1h_change_30min',
+            'rain_1h_lag_60min',
+            'rain_1h_change_60min',
+            'feels_like_fahrenheit_lag_15min',
+            'feels_like_fahrenheit_change_15min',
+            'feels_like_fahrenheit_lag_30min',
             'feels_like_fahrenheit_change_30min',
-
-            # Categorical features
-            'temp_humidity_ratio', 'humidity_high', 'humidity_very_high', 'heat_index_simple',
-            'hot_humid', 'approaching_storm', 'stable_clear', 'weather_stability_index',
-            'visibility_poor', 'fog_conditions', 'has_rain', 'rain_storm_conditions',
-
-            # Rush hour interactions
-            'rush_feels_like_fahrenheit_interaction', 'rush_wind_speed_interaction', 'rush_humidity_interaction'
+            'feels_like_fahrenheit_lag_60min',
+            'feels_like_fahrenheit_change_60min',
+            'humidity_lag_15min',
+            'humidity_change_15min',
+            'humidity_lag_30min',
+            'humidity_change_30min',
+            'humidity_lag_60min',
+            'humidity_change_60min',
+            'pressure_lag_15min',
+            'pressure_change_15min',
+            'pressure_lag_30min',
+            'pressure_change_30min',
+            'pressure_lag_60min',
+            'pressure_change_60min',
+            'humidity_high',
+            'humidity_very_high',
+            'humidity_extreme',
+            'heat_index_simple',
+            'temp_humidity_ratio',
+            'hot_humid',
+            'cold_humid',
+            'approaching_storm',
+            'stable_clear',
+            'weather_stability_index',
+            'visibility_poor',
+            'fog_conditions',
+            'air_clarity_index',
+            'rain_storm_conditions',
+            'has_rain',
+            'rain_amount',
+            'rain_heavy',
+            'rush_feels_like_fahrenheit_interaction',
+            'rush_wind_speed_interaction',
+            'rush_humidity_interaction',
         ]
 
     @st.cache_data(ttl=900)  # Cache for 15 minutes
@@ -197,9 +318,16 @@ class MTADelayPredictor:
 
     def engineer_features(self, current_weather: Dict, historical_weather: pd.DataFrame,
                           station_name: str) -> pd.DataFrame:
-        """Engineer features for prediction"""
+        """Engineer ALL 104 features that the trained model expects"""
 
         df = pd.DataFrame([current_weather])
+
+        # Fill any None values in current weather with 0
+        df = df.fillna(0)
+
+        # Ensure we have rain_1h column (even if None/NaN)
+        if 'rain_1h' not in df.columns:
+            df['rain_1h'] = 0.0
 
         # Temporal features
         now = datetime.now()
@@ -218,73 +346,153 @@ class MTADelayPredictor:
         else:
             df['minutes_since_rush_start'] = 0
 
-        # Rolling window features from historical data
-        if len(historical_weather) >= 8:
-            df['humidity_rolling_mean_120min'] = historical_weather['humidity'].head(8).mean()
-            df['feels_like_fahrenheit_rolling_min_120min'] = historical_weather['feels_like_fahrenheit'].head(8).min()
-            df['feels_like_fahrenheit_rolling_mean_120min'] = historical_weather['feels_like_fahrenheit'].head(8).mean()
-            df['feels_like_fahrenheit_rolling_std_120min'] = historical_weather['feels_like_fahrenheit'].head(8).std()
-            df['wind_speed_rolling_max_120min'] = historical_weather['wind_speed'].head(8).max()
-            df['humidity_rolling_std_120min'] = historical_weather['humidity'].head(8).std()
-            df['wind_speed_rolling_std_120min'] = historical_weather['wind_speed'].head(8).std()
+        # Ensure all core weather values are numeric
+        core_weather_defaults = {
+            'feels_like_fahrenheit': 70.0,
+            'humidity': 50.0,
+            'pressure': 1013.0,
+            'wind_speed': 0.0,
+            'visibility': 10000.0,
+            'cloudiness': 50.0,
+            'rain_1h': 0.0
+        }
 
-            # Lag features
-            if len(historical_weather) >= 4:
-                temp_60min_ago = historical_weather['feels_like_fahrenheit'].iloc[3]
-                temp_30min_ago = historical_weather['feels_like_fahrenheit'].iloc[1]
-
-                df['feels_like_fahrenheit_lag_60min'] = temp_60min_ago
-                df['feels_like_fahrenheit_change_60min'] = df['feels_like_fahrenheit'].iloc[0] - temp_60min_ago
-                df['feels_like_fahrenheit_change_30min'] = df['feels_like_fahrenheit'].iloc[0] - temp_30min_ago
+        for col, default_val in core_weather_defaults.items():
+            if col not in df.columns:
+                df[col] = default_val
             else:
-                df['feels_like_fahrenheit_lag_60min'] = df['feels_like_fahrenheit'].iloc[0]
-                df['feels_like_fahrenheit_change_60min'] = 0
-                df['feels_like_fahrenheit_change_30min'] = 0
-        else:
-            # Default values for insufficient data
-            for col in ['humidity_rolling_mean_120min', 'feels_like_fahrenheit_rolling_min_120min',
-                        'feels_like_fahrenheit_rolling_mean_120min', 'feels_like_fahrenheit_rolling_std_120min',
-                        'wind_speed_rolling_max_120min', 'humidity_rolling_std_120min',
-                        'wind_speed_rolling_std_120min']:
-                base_col = col.split('_rolling_')[0] if '_rolling_' in col else col.split('_')[0] + '_' + \
-                                                                                col.split('_')[1]
-                if base_col in df.columns:
-                    df[col] = df[base_col].iloc[0]
-                else:
-                    df[col] = 0
+                df[col] = df[col].fillna(default_val)
 
-        # Categorical features
-        df['temp_humidity_ratio'] = df['feels_like_fahrenheit'] / (df['humidity'] + 1)
-        df['humidity_high'] = (df['humidity'] >= 80).astype(int)
-        df['humidity_very_high'] = (df['humidity'] >= 90).astype(int)
-        df['heat_index_simple'] = df['feels_like_fahrenheit'] + 0.5 * (df['humidity'] - 50)
-        df['hot_humid'] = ((df['feels_like_fahrenheit'] >= 80) & (df['humidity'] >= 70)).astype(int)
+        # Core variables for calculations
+        core_vars = ['feels_like_fahrenheit', 'humidity', 'pressure', 'wind_speed', 'visibility', 'rain_1h']
+
+        # Create complete historical data with proper columns and fill NaN values
+        if len(historical_weather) >= 8:
+            hist_data = historical_weather.copy()
+
+            # Fill NaN values in historical data
+            for col, default_val in core_weather_defaults.items():
+                if col not in hist_data.columns:
+                    hist_data[col] = default_val
+                else:
+                    hist_data[col] = hist_data[col].fillna(default_val)
+
+            # Rolling window calculations (60min=4 periods, 120min=8 periods)
+            windows = [4, 8]
+            window_names = ['60min', '120min']
+
+            for var in core_vars:
+                for window, window_name in zip(windows, window_names):
+                    data_slice = hist_data[var].head(window)
+                    data_slice = data_slice.fillna(df[var].iloc[0])
+
+                    df[f'{var}_rolling_min_{window_name}'] = float(data_slice.min())
+                    df[f'{var}_rolling_max_{window_name}'] = float(data_slice.max())
+                    df[f'{var}_rolling_mean_{window_name}'] = float(data_slice.mean())
+                    df[f'{var}_rolling_std_{window_name}'] = float(data_slice.std()) if len(data_slice) > 1 else 0.0
+
+            # Lag features (15min=1 period, 30min=2 periods, 60min=4 periods)
+            lags = [1, 2, 4]
+            lag_names = ['15min', '30min', '60min']
+
+            for var in core_vars:
+                current_val = float(df[var].iloc[0])
+
+                for lag, lag_name in zip(lags, lag_names):
+                    if len(hist_data) > lag:
+                        lag_val = float(hist_data[var].iloc[lag])
+                        if pd.isna(lag_val):
+                            lag_val = current_val
+                    else:
+                        lag_val = current_val
+
+                    df[f'{var}_lag_{lag_name}'] = lag_val
+                    df[f'{var}_change_{lag_name}'] = current_val - lag_val
+
+        else:
+            # Insufficient historical data - use current values as defaults
+            for var in core_vars:
+                current_val = float(df[var].iloc[0])
+
+                # Rolling features
+                for window_name in ['60min', '120min']:
+                    df[f'{var}_rolling_min_{window_name}'] = current_val
+                    df[f'{var}_rolling_max_{window_name}'] = current_val
+                    df[f'{var}_rolling_mean_{window_name}'] = current_val
+                    df[f'{var}_rolling_std_{window_name}'] = 0.0
+
+                # Lag features
+                for lag_name in ['15min', '30min', '60min']:
+                    df[f'{var}_lag_{lag_name}'] = current_val
+                    df[f'{var}_change_{lag_name}'] = 0.0
+
+        # Convert all numeric columns to float
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        df[numeric_columns] = df[numeric_columns].astype(float)
+
+        # Categorical features - using safe operations
+        humidity_val = float(df['humidity'].iloc[0])
+        temp_val = float(df['feels_like_fahrenheit'].iloc[0])
+        pressure_val = float(df['pressure'].iloc[0])
+        visibility_val = float(df['visibility'].iloc[0])
+        rain_val = float(df['rain_1h'].iloc[0])
+
+        # Core categorical features
+        df['temp_humidity_ratio'] = temp_val / max(humidity_val + 1, 1)
+        df['humidity_high'] = int(humidity_val >= 80)
+        df['humidity_very_high'] = int(humidity_val >= 90)
+        df['humidity_extreme'] = int((humidity_val <= 25) or (humidity_val >= 95))
+
+        # Weather interaction features
+        df['heat_index_simple'] = temp_val + 0.5 * (humidity_val - 50)
+        df['hot_humid'] = int((temp_val >= 80) and (humidity_val >= 70))
+        df['cold_humid'] = int((temp_val <= 50) and (humidity_val >= 70))
 
         # Weather system features
-        df['approaching_storm'] = ((df['pressure'] <= 1012) & (df['humidity'] >= 80)).astype(int)
-        df['stable_clear'] = ((df['pressure'] >= 1020) & (df['humidity'] <= 60)).astype(int)
-        df['weather_stability_index'] = (df['pressure'] - 1013) / 10 - (df['humidity'] - 50) / 20
+        df['approaching_storm'] = int((pressure_val <= 1012) and (humidity_val >= 80))
+        df['stable_clear'] = int((pressure_val >= 1020) and (humidity_val <= 60))
+        df['weather_stability_index'] = (pressure_val - 1013) / 10 - (humidity_val - 50) / 20
 
         # Visibility features
-        df['visibility_poor'] = (df['visibility'] <= 5000).astype(int)
-        df['fog_conditions'] = ((df['visibility'] <= 3000) & (df['humidity'] >= 85)).astype(int)
+        df['visibility_poor'] = int(visibility_val <= 5000)
+        df['fog_conditions'] = int((visibility_val <= 5000) and (humidity_val >= 85))
+        df['air_clarity_index'] = visibility_val / max(humidity_val + 1, 1)
 
         # Precipitation features
-        df['has_rain'] = df['rain_1h'].notna().astype(int)
-        df['rain_storm_conditions'] = ((df['has_rain'] == 1) & (df['humidity'] >= 85)).astype(int)
+        df['has_rain'] = int(rain_val > 0)
+        df['rain_amount'] = rain_val
+        df['rain_heavy'] = int(rain_val > 7)
+        df['rain_storm_conditions'] = int((rain_val > 0) and (humidity_val >= 85))
 
         # Rush hour interactions
-        df['rush_feels_like_fahrenheit_interaction'] = df['is_rush_hour'] * df['feels_like_fahrenheit']
-        df['rush_wind_speed_interaction'] = df['is_rush_hour'] * df['wind_speed']
-        df['rush_humidity_interaction'] = df['is_rush_hour'] * df['humidity']
+        rush_hour_val = float(df['is_rush_hour'].iloc[0])
+        wind_val = float(df['wind_speed'].iloc[0])
 
-        # Fill missing values and ensure all columns are present
-        df = df.fillna(0)
-        for col in self.feature_columns:
-            if col not in df.columns:
-                df[col] = 0
+        df['rush_feels_like_fahrenheit_interaction'] = rush_hour_val * temp_val
+        df['rush_humidity_interaction'] = rush_hour_val * humidity_val
+        df['rush_wind_speed_interaction'] = rush_hour_val * wind_val
 
-        return df[self.feature_columns]
+        # Final cleanup - ensure all values are numeric
+        df = df.fillna(0.0)
+
+        # Convert all columns to numeric
+        for col in df.columns:
+            try:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+            except:
+                df[col] = 0.0
+
+        # Create a DataFrame with ALL required features, initialized to 0
+        required_features = self.feature_columns
+        final_df = pd.DataFrame(0.0, index=[0], columns=required_features)
+
+        # Fill in the features we calculated
+        for col in df.columns:
+            if col in required_features:
+                final_df[col] = df[col].iloc[0]
+
+        # Ensure all values are float
+        return final_df.astype(float)
 
     def predict_delay(self, station_name: str) -> Dict:
         """Make delay prediction for a specific station"""
