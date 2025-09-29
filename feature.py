@@ -256,47 +256,306 @@ class HybridWeatherFeatureEngineer:
         print(f"Created {len(categorical_features)} focused categorical features")
         return df
 
-    def run_hybrid_feature_engineering(self):
-        """Run the hybrid feature engineering pipeline"""
+    def run_seasonal_optimized_feature_engineering(self):
+        """Run optimized feature engineering for all-season data collection"""
         print("=" * 60)
-        print("HYBRID WEATHER FEATURE ENGINEERING")
-        print("Combining best of both approaches:")
-        print("✅ Rolling windows (weather persistence)")
-        print("✅ Lag features (past conditions)")
-        print("✅ Focused interactions (smart categoricals)")
-        print("✅ Temporal patterns (rush hour effects)")
+        print("SEASONAL WEATHER FEATURE ENGINEERING")
+        print("Optimized for year-round data collection:")
+        print("✅ Core temporal patterns (always important)")
+        print("✅ Weather persistence (120min rolling windows)")
+        print("✅ Seasonal adaptability (temperature ranges)")
+        print("✅ Precipitation variety (rain, snow, mixed)")
+        print("✅ Equipment stress indicators")
         print("=" * 60)
 
         # Load data
         df = self.load_and_merge_data()
 
-        # Create features in order of importance
-        df = self.create_temporal_features(df)  # Rush hour patterns
-        df = self.create_rolling_window_features(df)  # Weather persistence (KEY!)
-        df = self.create_lag_features(df)  # Past conditions matter
-        df = self.create_focused_categorical_features(df)  # Smart interactions
+        # Create seasonal-optimized features in the correct order
+        df = self.create_essential_temporal_features(df)  # Basic temporal features
+        df = self.create_core_weather_persistence_features(df)  # Rolling windows and lag features
+        df = self.create_seasonal_transition_features(df)  # Spring/fall rates (after lag exists)
+        df = self.create_seasonal_weather_features(df)  # Season-specific patterns
+        df = self.create_equipment_stress_features(df)  # Equipment stress indicators
 
         self.feature_data = df
 
-        print(f"\nHybrid feature engineering complete!")
-        print(f"Total engineered features: {len(self.engineered_features)}")
+        print(f"\nSeasonal feature engineering complete!")
+        print(f"Total optimized features: {len(self.engineered_features)}")
         print(f"Dataset shape: {df.shape}")
 
-        # Feature category breakdown
-        rolling_features = [f for f in self.engineered_features if 'rolling' in f]
-        lag_features = [f for f in self.engineered_features if 'lag' in f or 'change' in f]
-        categorical_features = [f for f in self.engineered_features if
-                                any(x in f for x in ['humidity_', 'temp_', 'weather_', 'fog_', 'rain_', 'rush_'])]
-        temporal_features = [f for f in self.engineered_features if
-                             any(x in f for x in ['hour', 'day_', 'weekend', 'rush_hour', 'minutes_since'])]
-
-        print(f"\nFeature Breakdown:")
-        print(f"  Rolling window features: {len(rolling_features)} (weather persistence)")
-        print(f"  Lag features: {len(lag_features)} (past conditions)")
-        print(f"  Categorical features: {len(categorical_features)} (smart interactions)")
-        print(f"  Temporal features: {len(temporal_features)} (time patterns)")
-
         return df
+
+    def create_essential_temporal_features(self, df):
+        """Essential temporal features that work year-round with specific seasonal patterns"""
+        print("Creating essential temporal features...")
+
+        # Core time features
+        df['hour'] = df['timestamp_delay'].dt.hour
+        df['day_of_week'] = df['timestamp_delay'].dt.dayofweek
+        df['month'] = df['timestamp_delay'].dt.month  # Critical for seasonal patterns
+        df['is_weekend'] = (df['day_of_week'] >= 5).astype(int)
+
+        # Rush hour patterns
+        df['is_morning_rush'] = ((df['hour'] >= 7) & (df['hour'] <= 9)).astype(int)
+        df['is_evening_rush'] = ((df['hour'] >= 17) & (df['hour'] <= 19)).astype(int)
+        df['is_rush_hour'] = (df['is_morning_rush'] | df['is_evening_rush']).astype(int)
+        df['minutes_since_rush_start'] = 0
+
+        morning_rush_mask = df['is_morning_rush'] == 1
+        evening_rush_mask = df['is_evening_rush'] == 1
+        df.loc[morning_rush_mask, 'minutes_since_rush_start'] = (df.loc[morning_rush_mask, 'hour'] - 7) * 60 + df.loc[
+            morning_rush_mask, 'timestamp_delay'].dt.minute
+        df.loc[evening_rush_mask, 'minutes_since_rush_start'] = (df.loc[evening_rush_mask, 'hour'] - 17) * 60 + df.loc[
+            evening_rush_mask, 'timestamp_delay'].dt.minute
+
+        # Specific seasonal indicators (more precise than transition seasons)
+        df['is_winter'] = (df['month'].isin([12, 1, 2])).astype(int)
+        df['is_spring'] = (df['month'].isin([3, 4, 5])).astype(int)
+        df['is_summer'] = (df['month'].isin([6, 7, 8])).astype(int)
+        df['is_fall'] = (df['month'].isin([9, 10, 11])).astype(int)
+
+        # Temperature deviation from seasonal norms (NYC-specific)
+        df['temp_deviation_seasonal'] = 0
+        seasonal_norms = {1: 35, 2: 38, 3: 48, 4: 58, 5: 68, 6: 76,
+                          7: 80, 8: 78, 9: 71, 10: 60, 11: 50, 12: 40}
+
+        for month, norm_temp in seasonal_norms.items():
+            month_mask = df['month'] == month
+            if 'feels_like_fahrenheit' in df.columns:
+                df.loc[month_mask, 'temp_deviation_seasonal'] = abs(
+                    df.loc[month_mask, 'feels_like_fahrenheit'] - norm_temp)
+
+        # NOTE: Spring/fall rate features will be added AFTER lag features are created
+
+        temporal_features = ['hour', 'day_of_week', 'month', 'is_weekend', 'is_morning_rush',
+                             'is_evening_rush', 'is_rush_hour', 'minutes_since_rush_start',
+                             'is_winter', 'is_spring', 'is_summer', 'is_fall', 'temp_deviation_seasonal']
+
+        self.engineered_features.extend(temporal_features)
+        return df
+
+    def create_seasonal_transition_features(self, df):
+        """Create seasonal transition features AFTER lag features exist"""
+        print("Creating seasonal transition features...")
+
+        transition_features = []
+
+        # Now we can safely create these features since lag features exist
+        if 'feels_like_fahrenheit_change_60min' in df.columns:
+            # Seasonal transition features (spring warming vs fall cooling)
+            df['spring_warming_rate'] = (df['is_spring'] * df['feels_like_fahrenheit_change_60min']).clip(lower=0)
+            df['fall_cooling_rate'] = (df['is_fall'] * abs(df['feels_like_fahrenheit_change_60min'].clip(upper=0)))
+            transition_features.extend(['spring_warming_rate', 'fall_cooling_rate'])
+        else:
+            # Fallback if lag features don't exist
+            df['spring_warming_rate'] = 0
+            df['fall_cooling_rate'] = 0
+            transition_features.extend(['spring_warming_rate', 'fall_cooling_rate'])
+
+        self.engineered_features.extend(transition_features)
+        return df
+
+    def create_core_weather_persistence_features(self, df):
+        """Core weather persistence features that matter most"""
+        print("Creating core weather persistence features...")
+
+        df = df.sort_values(['station_name', 'timestamp_delay'])
+
+        # Focus on the most critical variables and time windows
+        critical_variables = ['feels_like_fahrenheit', 'humidity', 'wind_speed', 'pressure']
+        precipitation_variables = ['rain_1h', 'snow_1h'] if 'snow_1h' in df.columns else ['rain_1h']
+
+        # 120-minute windows (most predictive from your analysis)
+        window = 8  # 120 minutes
+        window_name = '120min'
+
+        persistence_features = []
+
+        for variable in critical_variables:
+            if variable in df.columns:
+                # Most important statistics from your analysis
+                df[f'{variable}_rolling_mean_{window_name}'] = df.groupby('station_name')[variable].rolling(window,
+                                                                                                            min_periods=1).mean().reset_index(
+                    0, drop=True)
+                df[f'{variable}_rolling_std_{window_name}'] = df.groupby('station_name')[variable].rolling(window,
+                                                                                                           min_periods=1).std().reset_index(
+                    0, drop=True)
+                df[f'{variable}_rolling_min_{window_name}'] = df.groupby('station_name')[variable].rolling(window,
+                                                                                                           min_periods=1).min().reset_index(
+                    0, drop=True)
+                df[f'{variable}_rolling_max_{window_name}'] = df.groupby('station_name')[variable].rolling(window,
+                                                                                                           min_periods=1).max().reset_index(
+                    0, drop=True)
+
+                persistence_features.extend([
+                    f'{variable}_rolling_mean_{window_name}',
+                    f'{variable}_rolling_std_{window_name}',
+                    f'{variable}_rolling_min_{window_name}',
+                    f'{variable}_rolling_max_{window_name}'
+                ])
+
+        # Precipitation persistence (critical for all seasons)
+        for variable in precipitation_variables:
+            if variable in df.columns:
+                df[f'{variable}_rolling_min_60min'] = df.groupby('station_name')[variable].rolling(4,
+                                                                                                   min_periods=1).min().reset_index(
+                    0, drop=True)
+                df[f'{variable}_rolling_max_120min'] = df.groupby('station_name')[variable].rolling(window,
+                                                                                                    min_periods=1).max().reset_index(
+                    0, drop=True)
+                persistence_features.extend([f'{variable}_rolling_min_60min', f'{variable}_rolling_max_120min'])
+
+        # Weather change detection (60-min lag) - but only if we have enough data
+        for variable in critical_variables:
+            if variable in df.columns:
+                lag_feature = f'{variable}_lag_60min'
+                change_feature = f'{variable}_change_60min'
+                df[lag_feature] = df.groupby('station_name')[variable].shift(4)
+                df[change_feature] = df[variable] - df[lag_feature]
+                persistence_features.extend([lag_feature, change_feature])
+
+        # Fill NaN values that may result from rolling/lag calculations
+        for feature in persistence_features:
+            if feature in df.columns:
+                df[feature] = df[feature].fillna(0)
+
+        self.engineered_features.extend(persistence_features)
+        print(f"Created {len(persistence_features)} weather persistence features")
+        return df
+
+    def create_seasonal_weather_features(self, df):
+        """Weather features that adapt to specific seasonal patterns"""
+        print("Creating specific seasonal weather features...")
+
+        seasonal_features = []
+
+        # Temperature features that work year-round
+        if 'feels_like_fahrenheit' in df.columns:
+            df['temp_extreme_cold'] = (df['feels_like_fahrenheit'] <= 20).astype(int)  # Winter
+            df['temp_freezing'] = (df['feels_like_fahrenheit'] <= 32).astype(int)  # Winter/Spring
+            df['temp_hot'] = (df['feels_like_fahrenheit'] >= 85).astype(int)  # Summer
+            df['temp_extreme_hot'] = (df['feels_like_fahrenheit'] >= 95).astype(int)  # Summer
+
+            seasonal_features.extend(['temp_extreme_cold', 'temp_freezing', 'temp_hot', 'temp_extreme_hot'])
+
+        # Spring-specific weather patterns
+        if 'is_spring' in df.columns and 'feels_like_fahrenheit' in df.columns:
+            # Spring warming spells (rapid temperature increases)
+            df['spring_warm_spell'] = ((df['is_spring'] == 1) & (df['feels_like_fahrenheit'] >= 70) &
+                                       (df['feels_like_fahrenheit_change_60min'] > 5)).astype(int)
+
+            # Spring freeze risk (warm days followed by potential freezing)
+            df['spring_freeze_risk'] = ((df['is_spring'] == 1) & (df['feels_like_fahrenheit'] <= 35) &
+                                        (df['feels_like_fahrenheit_rolling_max_120min'] > 50)).astype(int)
+
+            seasonal_features.extend(['spring_warm_spell', 'spring_freeze_risk'])
+
+        # Fall-specific weather patterns
+        if 'is_fall' in df.columns and 'feels_like_fahrenheit' in df.columns:
+            # Fall cooling trends (consistent temperature drops)
+            df['fall_cooling_trend'] = ((df['is_fall'] == 1) &
+                                        (df['feels_like_fahrenheit_change_60min'] < -3)).astype(int)
+
+            # Early winter preparation (fall + cold conditions)
+            df['early_winter_conditions'] = ((df['is_fall'] == 1) & (df['feels_like_fahrenheit'] <= 40)).astype(int)
+
+            seasonal_features.extend(['fall_cooling_trend', 'early_winter_conditions'])
+
+        # Humidity features (important all seasons)
+        if 'humidity' in df.columns:
+            df['humidity_high'] = (df['humidity'] >= 80).astype(int)
+            df['humidity_very_high'] = (df['humidity'] >= 90).astype(int)
+            seasonal_features.extend(['humidity_high', 'humidity_very_high'])
+
+        # Enhanced precipitation features for all seasons
+        if 'rain_1h' in df.columns:
+            df['has_rain'] = df['rain_1h'].notna().astype(int)
+            df['rain_amount'] = df['rain_1h'].fillna(0)
+            df['rain_heavy'] = (df['rain_amount'] > 7).astype(int)
+            seasonal_features.extend(['has_rain', 'rain_amount', 'rain_heavy'])
+
+        if 'snow_1h' in df.columns:
+            df['has_snow'] = df['snow_1h'].notna().astype(int)
+            df['snow_amount'] = df['snow_1h'].fillna(0)
+            df['snow_heavy'] = (df['snow_amount'] > 2).astype(int)
+            seasonal_features.extend(['has_snow', 'snow_amount', 'snow_heavy'])
+
+        # Weather system features
+        if 'pressure' in df.columns and 'humidity' in df.columns:
+            df['approaching_storm'] = ((df['pressure'] <= 1012) & (df['humidity'] >= 80)).astype(int)
+            df['stable_clear'] = ((df['pressure'] >= 1020) & (df['humidity'] <= 60)).astype(int)
+            df['weather_stability_index'] = (df['pressure'] - 1013) / 10 - (df['humidity'] - 50) / 20
+            seasonal_features.extend(['approaching_storm', 'stable_clear', 'weather_stability_index'])
+
+        # Season-specific weather system interactions
+        if 'is_spring' in df.columns and 'approaching_storm' in df.columns:
+            df['spring_storm'] = (df['is_spring'] * df['approaching_storm']).astype(int)
+            seasonal_features.append('spring_storm')
+
+        if 'is_fall' in df.columns and 'stable_clear' in df.columns:
+            df['fall_high_pressure'] = (df['is_fall'] * df['stable_clear']).astype(int)
+            seasonal_features.append('fall_high_pressure')
+
+        # Multi-season interaction features
+        if 'feels_like_fahrenheit' in df.columns and 'humidity' in df.columns:
+            df['heat_index_simple'] = df['feels_like_fahrenheit'] + 0.5 * (df['humidity'] - 50)
+            df['temp_humidity_ratio'] = df['feels_like_fahrenheit'] / (df['humidity'] + 1)
+            seasonal_features.extend(['heat_index_simple', 'temp_humidity_ratio'])
+
+        # Critical rush hour interaction (your #3 most important feature)
+        if 'is_rush_hour' in df.columns and 'wind_speed' in df.columns:
+            df['rush_wind_speed_interaction'] = df['is_rush_hour'] * df['wind_speed'].fillna(0)
+            seasonal_features.append('rush_wind_speed_interaction')
+
+        self.engineered_features.extend(seasonal_features)
+        print(f"Created {len(seasonal_features)} specific seasonal weather features")
+        return df
+
+    def create_equipment_stress_features(self, df):
+        """Features that capture equipment stress across seasons"""
+        print("Creating equipment stress features...")
+
+        equipment_features = []
+
+        # Multi-season equipment stress
+        if 'feels_like_fahrenheit' in df.columns and 'humidity' in df.columns:
+            # Cold + wet = rail/electrical issues
+            df['cold_wet_stress'] = ((df['feels_like_fahrenheit'] <= 35) & (df['humidity'] >= 80)).astype(int)
+            # Hot + humid = expansion/cooling issues
+            df['hot_humid_stress'] = ((df['feels_like_fahrenheit'] >= 85) & (df['humidity'] >= 70)).astype(int)
+            equipment_features.extend(['cold_wet_stress', 'hot_humid_stress'])
+
+        # Visibility-based operational stress
+        if 'visibility' in df.columns and 'humidity' in df.columns:
+            df['poor_visibility'] = (df['visibility'] <= 5000).astype(int)
+            df['fog_conditions'] = ((df['visibility'] <= 3000) & (df['humidity'] >= 85)).astype(int)
+            equipment_features.extend(['poor_visibility', 'fog_conditions'])
+
+        # Precipitation + temperature combinations (freeze/thaw, rain/snow mix)
+        if 'feels_like_fahrenheit' in df.columns:
+            if 'rain_amount' in df.columns:  # Use rain_amount instead of rain_1h for consistency
+                df['freezing_rain_risk'] = ((df['feels_like_fahrenheit'] <= 34) & (df['rain_amount'] > 0)).astype(int)
+                equipment_features.append('freezing_rain_risk')
+
+            if 'has_snow' in df.columns and 'has_rain' in df.columns:
+                df['mixed_precipitation'] = ((df['has_snow'] == 1) & (df['has_rain'] == 1)).astype(int)
+                equipment_features.append('mixed_precipitation')
+
+        # Fill any NaN values
+        for feature in equipment_features:
+            if feature in df.columns:
+                df[feature] = df[feature].fillna(0).astype(int)
+
+        self.engineered_features.extend(equipment_features)
+        print(f"Created {len(equipment_features)} equipment stress features")
+        return df
+
+    # Include the old method name for backward compatibility
+    def run_hybrid_feature_engineering(self):
+        """Backward compatibility - calls the seasonal optimized version"""
+        print("Note: run_hybrid_feature_engineering() is now run_seasonal_optimized_feature_engineering()")
+        return self.run_seasonal_optimized_feature_engineering()
 
     def evaluate_hybrid_model(self):
         """Evaluate the hybrid model performance"""
@@ -369,6 +628,29 @@ class HybridWeatherFeatureEngineer:
 
         # Category performance summary
         self._analyze_category_performance(feature_importance)
+
+        # SAVE THE MODEL AND DATASET FOR FEATURE ANALYSIS
+        print(f"\n💾 SAVING MODEL AND DATASET FOR ANALYSIS...")
+
+        import pickle
+
+        # Save the trained Random Forest model
+        with open('mta_delay_model.pkl', 'wb') as f:
+            pickle.dump(rf, f)
+
+        # Save feature columns for reference
+        with open('feature_columns.pkl', 'wb') as f:
+            pickle.dump(available_features, f)
+
+        # SAVE THE COMPLETE DATASET FOR FEATURE SELECTION ANALYSIS
+        with open('mta_features_dataset.csv', 'w') as f:
+            self.feature_data.to_csv(f, index=False)
+
+        print(f"✅ Saved for analysis:")
+        print(f"   - Model: mta_delay_model.pkl")
+        print(f"   - Features: feature_columns.pkl")
+        print(f"   - Dataset: mta_features_dataset.csv ({self.feature_data.shape})")
+        print(f"   - Ready for feature selection analysis!")
 
         return feature_importance, r2, np.sqrt(mse)
 
